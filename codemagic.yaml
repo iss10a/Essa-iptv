@@ -1,0 +1,16 @@
+workflows:
+  android-apk:
+    name: EssaIPTV Android APK
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      java: 17
+    scripts:
+      - name: Set up Gradle wrapper
+        script: |
+          gradle wrapper --gradle-version 8.7 --distribution-type bin
+      - name: Build release APK
+        script: |
+          ./gradlew :app:assembleRelease --stacktrace --no-daemon
+    artifacts:
+      - app/build/outputs/apk/release/*.apk
