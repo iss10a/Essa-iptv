@@ -1,0 +1,47 @@
+workflows:
+  android-apk:
+    name: EssaIPTV Android APK
+    max_build_duration: 60
+    instance_type: linux_x2
+    environment:
+      java: 17
+      vars:
+        GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8"
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+    scripts:
+      - name: Show environment
+        script: |
+          java -version
+          gradle --version || true
+          ls -la
+
+      - name: Generate Gradle wrapper (if missing)
+        script: |
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper --gradle-version 8.7 --distribution-type bin
+          fi
+          chmod +x ./gradlew
+
+      - name: Build release APK
+        script: |
+          ./gradlew :app:assembleRelease --stacktrace --no-daemon
+
+      - name: List output
+        script: |
+          find app/build/outputs -name "*.apk" -print
+
+    artifacts:
+      - app/build/outputs/apk/release/*.apk
+      - app/build/outputs/**/mapping.txt
+      - app/build/reports/**
+
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
