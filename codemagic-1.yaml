@@ -1,0 +1,68 @@
+workflows:
+  android-apk:
+    name: EssaIPTV Android APK
+    max_build_duration: 60
+    environment:
+      java: 17
+      vars:
+        GRADLE_OPTS: "-Dorg.gradle.jvmargs=-Xmx3g -Dfile.encoding=UTF-8"
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.gradle/wrapper
+    scripts:
+      - name: Unzip project archive (if the repo contains a zip)
+        script: |
+          set -e
+          echo "=== Repository contents ==="
+          ls -la
+          mkdir -p /tmp/src
+          ZIP_FILE=$(find . -maxdepth 2 -name '*.zip' | head -1)
+          if [ -n "$ZIP_FILE" ]; then
+            echo "Found archive: $ZIP_FILE"
+            unzip -q -o "$ZIP_FILE" -d /tmp/src
+          else
+            echo "No archive found, using repository files directly."
+            cp -r . /tmp/src
+          fi
+          echo "=== Extracted contents ==="
+          ls -la /tmp/src
+
+      - name: Locate Gradle project
+        script: |
+          set -e
+          SETTINGS=$(find /tmp/src -maxdepth 4 -name 'settings.gradle.kts' -o -maxdepth 4 -name 'settings.gradle' | head -1)
+          if [ -z "$SETTINGS" ]; then
+            echo "ERROR: No Gradle project (settings.gradle.kts) found."
+            find /tmp/src -maxdepth 3 -type d
+            exit 1
+          fi
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo "Project directory: $PROJECT_DIR"
+          echo "$PROJECT_DIR" > /tmp/project_dir.txt
+          ls -la "$PROJECT_DIR"
+
+      - name: Generate Gradle wrapper (if missing)
+        script: |
+          set -e
+          cd "$(cat /tmp/project_dir.txt)"
+          if [ ! -f "./gradlew" ]; then
+            gradle wrapper --gradle-version 8.7 --distribution-type bin
+          fi
+          chmod +x ./gradlew
+
+      - name: Build release APK
+        script: |
+          set -e
+          cd "$(cat /tmp/project_dir.txt)"
+          ./gradlew :app:assembleRelease --stacktrace --no-daemon
+
+      - name: Copy APK to workspace
+        script: |
+          set -e
+          mkdir -p "$CM_BUILD_DIR/output"
+          find /tmp/src -name "*.apk" -exec cp {} "$CM_BUILD_DIR/output/" \;
+          ls -la "$CM_BUILD_DIR/output"
+
+    artifacts:
+      - output/*.apk
